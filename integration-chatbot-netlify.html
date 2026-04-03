@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>∫ Integration Solver Bot</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg:       #07071a;
+      --bg2:      #0e0e2a;
+      --bg3:      #15103a;
+      --bg4:      #1c1650;
+      --acc1:     #7c5cfc;
+      --acc2:     #c084fc;
+      --acc3:     #38bdf8;
+      --green:    #4ade80;
+      --fg:       #e2dcff;
+      --fg2:      #9b8fcb;
+      --fg3:      #5a4e8a;
+      --user-bg:  rgba(192,132,252,0.18);
+      --bot-bg:   rgba(124,92,252,0.18);
+      --border:   rgba(124,92,252,0.3);
+    }
+
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+    body {
+      font-family: 'JetBrains Mono', monospace;
+      background: var(--bg);
+      color: var(--fg);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      overflow: hidden;
+    }
+
+    /* animated bg */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background:
+        radial-gradient(ellipse 80% 50% at 20% 20%, rgba(124,92,252,0.12) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 80% 80%, rgba(192,132,252,0.10) 0%, transparent 60%),
+        radial-gradient(ellipse 40% 60% at 60% 10%, rgba(56,189,248,0.07) 0%, transparent 60%);
+      pointer-events: none; z-index: 0;
+    }
+
+    .app {
+      position: relative; z-index: 1;
+      width: 100%; max-width: 860px;
+      height: 96vh;
+      display: flex; flex-direction: column;
+      background: rgba(14,14,42,0.85);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      backdrop-filter: blur(20px);
+      overflow: hidden;
+      box-shadow: 0 0 60px rgba(124,92,252,0.15), 0 0 0 1px rgba(255,255,255,0.04);
+    }
+
+    /* ── HEADER ── */
+    .header {
+      padding: 18px 28px 14px;
+      background: linear-gradient(135deg, rgba(28,22,80,0.9), rgba(21,16,58,0.9));
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 14px;
+    }
+    .header-icon {
+      width: 46px; height: 46px;
+      background: linear-gradient(135deg, var(--acc1), var(--acc2));
+      border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.4rem;
+      box-shadow: 0 4px 20px rgba(124,92,252,0.4);
+      flex-shrink: 0;
+    }
+    .header-text h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.25rem; font-weight: 800;
+      background: linear-gradient(90deg, var(--acc2), var(--acc3));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .header-text p { font-size: 0.75rem; color: var(--fg2); margin-top: 2px; }
+    .status-dot {
+      margin-left: auto;
+      display: flex; align-items: center; gap: 6px;
+      font-size: 0.72rem; color: var(--green);
+    }
+    .status-dot::before {
+      content: '';
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    /* ── TABS ── */
+    .tabs {
+      display: flex;
+      background: rgba(7,7,26,0.6);
+      border-bottom: 1px solid rgba(124,92,252,0.2);
+    }
+    .tab {
+      flex: 1; padding: 11px 10px;
+      text-align: center;
+      font-size: 0.82rem; font-weight: 600;
+      color: var(--fg3);
+      cursor: pointer;
+      transition: all 0.2s;
+      border-bottom: 2px solid transparent;
+      user-select: none;
+    }
+    .tab:hover { color: var(--fg2); }
+    .tab.active {
+      color: var(--acc2);
+      border-bottom-color: var(--acc2);
+      background: rgba(124,92,252,0.08);
+    }
+
+    /* ── INPUT PANEL ── */
+    .input-panel {
+      padding: 14px 20px 10px;
+      background: rgba(7,7,26,0.5);
+      border-bottom: 1px solid rgba(124,92,252,0.12);
+    }
+    .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .sym { font-size: 1.3rem; color: var(--fg2); flex-shrink: 0; }
+    .field {
+      flex: 1; min-width: 0;
+      padding: 10px 16px;
+      background: rgba(28,22,80,0.6);
+      border: 1px solid rgba(124,92,252,0.3);
+      border-radius: 12px;
+      color: var(--fg);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.92rem;
+      outline: none;
+      transition: border 0.2s, box-shadow 0.2s;
+    }
+    .field:focus {
+      border-color: var(--acc1);
+      box-shadow: 0 0 0 3px rgba(124,92,252,0.15);
+    }
+    .field::placeholder { color: var(--fg3); }
+    .field.small { width: 72px; flex: none; text-align: center; }
+    .lbl { font-size: 0.78rem; color: var(--fg2); flex-shrink: 0; }
+
+    .solve-btn {
+      padding: 10px 22px;
+      background: linear-gradient(135deg, var(--acc1), var(--acc2));
+      border: none; border-radius: 12px;
+      color: white; font-family: 'JetBrains Mono', monospace;
+      font-size: 0.88rem; font-weight: 700;
+      cursor: pointer; flex-shrink: 0;
+      transition: opacity 0.2s, transform 0.1s, box-shadow 0.2s;
+      box-shadow: 0 4px 16px rgba(124,92,252,0.35);
+    }
+    .solve-btn:hover { opacity: 0.88; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(124,92,252,0.45); }
+    .solve-btn:active { transform: translateY(0); }
+    .solve-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+    .hidden { display: none !important; }
+
+    /* ── EXAMPLES ── */
+    .ex-bar {
+      padding: 8px 20px 7px;
+      background: rgba(7,7,26,0.4);
+      border-bottom: 1px solid rgba(124,92,252,0.08);
+      display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    }
+    .ex-lbl { font-size: 0.7rem; color: var(--fg3); margin-right: 4px; }
+    .ex-btn {
+      padding: 4px 11px;
+      background: rgba(28,22,80,0.7);
+      border: 1px solid rgba(124,92,252,0.3);
+      border-radius: 20px;
+      color: var(--acc2);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      cursor: pointer;
+      transition: all 0.18s;
+    }
+    .ex-btn:hover { background: rgba(124,92,252,0.25); color: white; border-color: var(--acc1); }
+
+    /* ── CHAT ── */
+    .chat {
+      flex: 1; overflow-y: auto;
+      padding: 20px;
+      display: flex; flex-direction: column; gap: 16px;
+      scroll-behavior: smooth;
+    }
+    .chat::-webkit-scrollbar { width: 5px; }
+    .chat::-webkit-scrollbar-track { background: transparent; }
+    .chat::-webkit-scrollbar-thumb { background: var(--fg3); border-radius: 10px; }
+
+    .msg { display: flex; gap: 10px; animation: fadeUp 0.3s ease; }
+    .msg.user { flex-direction: row-reverse; }
+    @keyframes fadeUp {
+      from { opacity:0; transform: translateY(10px); }
+      to   { opacity:1; transform: translateY(0); }
+    }
+
+    .avatar {
+      width: 36px; height: 36px; border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem; flex-shrink: 0;
+    }
+    .bot-av  { background: linear-gradient(135deg, var(--acc1), var(--acc2)); box-shadow: 0 2px 12px rgba(124,92,252,0.35); }
+    .user-av { background: linear-gradient(135deg, #ec4899, #f97316); box-shadow: 0 2px 12px rgba(236,72,153,0.3); }
+
+    .bubble {
+      max-width: 80%;
+      padding: 12px 16px;
+      border-radius: 16px;
+      font-size: 0.88rem;
+      line-height: 1.7;
+    }
+    .bot-bubble {
+      background: var(--bot-bg);
+      border: 1px solid var(--border);
+      border-top-left-radius: 4px;
+    }
+    .user-bubble {
+      background: var(--user-bg);
+      border: 1px solid rgba(192,132,252,0.3);
+      border-top-right-radius: 4px;
+      color: #f3e8ff;
+    }
+
+    .step-line {
+      margin: 5px 0;
+      padding: 7px 12px;
+      background: rgba(56,189,248,0.08);
+      border-left: 3px solid var(--acc3);
+      border-radius: 0 8px 8px 0;
+      font-size: 0.84rem;
+      color: #bae6fd;
+    }
+    .answer-line {
+      margin-top: 12px;
+      padding: 10px 14px;
+      background: rgba(74,222,128,0.1);
+      border: 1px solid rgba(74,222,128,0.3);
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: var(--green);
+    }
+
+    /* typing dots */
+    .typing {
+      display: flex; gap: 5px;
+      padding: 12px 16px;
+      background: var(--bot-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px; border-top-left-radius: 4px;
+      width: fit-content;
+    }
+    .typing span {
+      width: 7px; height: 7px;
+      background: var(--acc2); border-radius: 50%;
+      animation: bounce 1.3s infinite;
+    }
+    .typing span:nth-child(2) { animation-delay: 0.18s; }
+    .typing span:nth-child(3) { animation-delay: 0.36s; }
+    @keyframes bounce {
+      0%,80%,100% { transform: translateY(0); }
+      40%          { transform: translateY(-8px); }
+    }
+
+    /* ── FOOTER ── */
+    .footer {
+      padding: 8px 20px;
+      background: rgba(7,7,26,0.6);
+      border-top: 1px solid rgba(124,92,252,0.1);
+      text-align: center;
+      font-size: 0.68rem;
+      color: var(--fg3);
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 540px) {
+      body { padding: 8px; }
+      .app { border-radius: 16px; height: 100vh; }
+      .header { padding: 12px 16px; }
+      .bubble { max-width: 92%; }
+      .row { gap: 6px; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-icon">∫</div>
+    <div class="header-text">
+      <h1>Integration Solver Bot</h1>
+      <p>Definite &amp; Indefinite — step-by-step solution</p>
+    </div>
+    <div class="status-dot">Online</div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <div class="tab active" id="tab-indef" onclick="switchTab('indefinite')">📐 Indefinite &nbsp;∫f(x)dx</div>
+    <div class="tab"        id="tab-def"   onclick="switchTab('definite')">🎯 Definite &nbsp;∫ₐᵇf(x)dx</div>
+  </div>
+
+  <!-- INPUT PANEL -->
+  <div class="input-panel">
+
+    <!-- Indefinite -->
+    <div class="row" id="indef-row">
+      <span class="sym">∫</span>
+      <input class="field" id="indef-expr" placeholder="e.g.  x^2 + sin(x)" onkeydown="if(event.key==='Enter')solve()"/>
+      <span class="lbl">dx</span>
+      <button class="solve-btn" id="btn-indef" onclick="solve()">Solve ➤</button>
+    </div>
+
+    <!-- Definite -->
+    <div class="row hidden" id="def-row">
+      <span class="sym">∫</span>
+      <input class="field small" id="lower" placeholder="a" title="Lower limit" onkeydown="if(event.key==='Enter')solve()"/>
+      <span class="lbl">→</span>
+      <input class="field small" id="upper" placeholder="b" title="Upper limit" onkeydown="if(event.key==='Enter')solve()"/>
+      <input class="field" id="def-expr" placeholder="e.g.  x^2 + 3x" onkeydown="if(event.key==='Enter')solve()"/>
+      <span class="lbl">dx</span>
+      <button class="solve-btn" id="btn-def" onclick="solve()">Solve ➤</button>
+    </div>
+
+  </div>
+
+  <!-- EXAMPLES -->
+  <div class="ex-bar" id="ex-bar">
+    <span class="ex-lbl" id="ex-lbl">Examples:</span>
+  </div>
+
+  <!-- CHAT -->
+  <div class="chat" id="chat"></div>
+
+  <!-- FOOTER -->
+  <div class="footer">Powered by Claude AI &nbsp;·&nbsp; Definite &amp; Indefinite Integration Solver</div>
+
+</div>
+
+<script>
+// ─── DATA ────────────────────────────────────────────────────────────────────
+const INDEF_EX = [
+  { l:"∫ x²",       v:"x^2" },
+  { l:"∫ sin(x)",   v:"sin(x)" },
+  { l:"∫ eˣ",       v:"e^x" },
+  { l:"∫ 1/x",      v:"1/x" },
+  { l:"∫ x³+2x",    v:"x^3 + 2x" },
+  { l:"∫ cos(x)",   v:"cos(x)" },
+  { l:"∫ tan(x)",   v:"tan(x)" },
+  { l:"∫ √x",       v:"sqrt(x)" },
+  { l:"∫ x²+3x+5",  v:"x^2 + 3x + 5" },
+  { l:"∫ ln(x)",    v:"ln(x)" },
+];
+
+const DEF_EX = [
+  { l:"∫₀¹ x²",         v:"x^2",      a:"0",  b:"1" },
+  { l:"∫₀^π sin(x)",    v:"sin(x)",   a:"0",  b:"pi" },
+  { l:"∫₁² eˣ",         v:"e^x",      a:"1",  b:"2" },
+  { l:"∫₁^e 1/x",       v:"1/x",      a:"1",  b:"e" },
+  { l:"∫₀² x³",         v:"x^3",      a:"0",  b:"2" },
+  { l:"∫₀^π/2 cos(x)",  v:"cos(x)",   a:"0",  b:"pi/2" },
+  { l:"∫₋₁¹ x²+1",      v:"x^2+1",   a:"-1", b:"1" },
+  { l:"∫₀³ 3x²",        v:"3*x^2",    a:"0",  b:"3" },
+];
+
+const SYSTEM = `You are an expert calculus integration solver chatbot. Solve integrals step by step.
+
+For INDEFINITE integrals:
+- Show numbered steps
+- State which rule is used (Power Rule, Chain Rule, u-substitution, Integration by Parts, Trig Identity, etc.)
+- End with exactly: "Final Answer: ∫f(x)dx = result + C"
+
+For DEFINITE integrals:
+- First find antiderivative with numbered steps
+- Then apply Fundamental Theorem of Calculus: F(b) - F(a)
+- Compute the exact numeric value step by step
+- End with exactly: "Final Answer: ∫[a to b] f(x)dx = numeric_value"
+
+Use unicode math symbols: ∫ ² ³ √ π ∞ ±
+Explain in simple Hinglish (Hindi+English mix).
+Plain text only — no LaTeX, no markdown, no asterisks.`;
+
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let mode = "indefinite";
+let typingEl = null;
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+renderExamples();
+addBotMsg(
+  "Salam bhai! 👋\n" +
+  "Main tera Integration Solver hoon.\n\n" +
+  "📐 Indefinite Tab — expression likho, answer + C milega\n" +
+  "🎯 Definite Tab — limits + expression daalo, exact value milegi\n\n" +
+  "Koi bhi integral likho — step-by-step solve karunga! 🚀"
+);
+
+// ─── TAB SWITCH ──────────────────────────────────────────────────────────────
+function switchTab(m) {
+  mode = m;
+  const indef = m === "indefinite";
+  document.getElementById("tab-indef").classList.toggle("active", indef);
+  document.getElementById("tab-def").classList.toggle("active", !indef);
+  document.getElementById("indef-row").classList.toggle("hidden", !indef);
+  document.getElementById("def-row").classList.toggle("hidden", indef);
+  renderExamples();
+  setTimeout(() => {
+    (indef ? document.getElementById("indef-expr") : document.getElementById("lower")).focus();
+  }, 50);
+}
+
+// ─── EXAMPLES ────────────────────────────────────────────────────────────────
+function renderExamples() {
+  const bar = document.getElementById("ex-bar");
+  bar.querySelectorAll(".ex-btn").forEach(b => b.remove());
+  document.getElementById("ex-lbl").textContent =
+    mode === "indefinite" ? "Indefinite Examples:" : "Definite Examples:";
+
+  const list = mode === "indefinite" ? INDEF_EX : DEF_EX;
+  list.forEach(ex => {
+    const btn = document.createElement("button");
+    btn.className = "ex-btn";
+    btn.textContent = ex.l;
+    btn.onclick = () => mode === "indefinite" ? useIndef(ex.v) : useDef(ex.v, ex.a, ex.b);
+    bar.appendChild(btn);
+  });
+}
+
+function useIndef(v) {
+  document.getElementById("indef-expr").value = v;
+  solve();
+}
+function useDef(v, a, b) {
+  document.getElementById("def-expr").value = v;
+  document.getElementById("lower").value = a;
+  document.getElementById("upper").value = b;
+  solve();
+}
+
+// ─── SOLVE ───────────────────────────────────────────────────────────────────
+async function solve() {
+  let prompt, userLabel;
+
+  if (mode === "indefinite") {
+    const expr = document.getElementById("indef-expr").value.trim();
+    if (!expr) return;
+    prompt    = `Solve this INDEFINITE integral step by step: ∫ ${expr} dx`;
+    userLabel = `∫ ${expr} dx`;
+    document.getElementById("indef-expr").value = "";
+  } else {
+    const expr = document.getElementById("def-expr").value.trim();
+    const a    = document.getElementById("lower").value.trim();
+    const b    = document.getElementById("upper").value.trim();
+    if (!expr || !a || !b) {
+      alert("Bhai! Expression aur dono limits (a aur b) fill karo 😅");
+      return;
+    }
+    prompt    = `Solve this DEFINITE integral step by step: ∫ from ${a} to ${b} of (${expr}) dx`;
+    userLabel = `∫[${a} → ${b}] ${expr} dx`;
+    document.getElementById("def-expr").value = "";
+    document.getElementById("lower").value    = "";
+    document.getElementById("upper").value    = "";
+  }
+
+  setBtns(false);
+  addUserMsg(userLabel);
+  showTyping();
+
+  try {
+    const reply = await callClaude(prompt);
+    hideTyping();
+    addBotMsg(reply);
+  } catch (err) {
+    hideTyping();
+    addBotMsg("Yaar kuch error aa gaya 😅\n" + err.message + "\n\nAPI key ya internet check karo!");
+  }
+  setBtns(true);
+}
+
+// ─── CLAUDE API ──────────────────────────────────────────────────────────────
+async function callClaude(prompt) {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": "PASTE_YOUR_API_KEY_HERE",
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-ipc": "true"
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 1200,
+      system: SYSTEM,
+      messages: [{ role: "user", content: prompt }]
+    })
+  });
+
+  const data = await res.json();
+  console.log(data); // debugging
+
+  return data.content?.map(b => b.text || "").join("") || "No response";
+}
+
+// ─── CHAT HELPERS ─────────────────────────────────────────────────────────────
+function addUserMsg(text) {
+  const chat = document.getElementById("chat");
+  const div = document.createElement("div");
+  div.className = "msg user";
+  div.innerHTML = `
+    <div class="avatar user-av">🧑</div>
+    <div class="bubble user-bubble">${esc(text)}</div>`;
+  chat.appendChild(div);
+  scrollChat();
+}
+
+function addBotMsg(text) {
+  const chat = document.getElementById("chat");
+  const div = document.createElement("div");
+  div.className = "msg";
+  div.innerHTML = `
+    <div class="avatar bot-av">🤖</div>
+    <div class="bubble bot-bubble">${formatBot(text)}</div>`;
+  chat.appendChild(div);
+  scrollChat();
+}
+
+function formatBot(text) {
+  return text.split("\n").map(line => {
+    const t = line.trim();
+    if (!t) return "<br>";
+    if (t.toLowerCase().startsWith("final answer"))
+      return `<div class="answer-line">✅ ${esc(t)}</div>`;
+    if (/^step\s*\d+/i.test(t) || /^\d+[\.\):-]/.test(t))
+      return `<div class="step-line">${esc(t)}</div>`;
+    return `<span>${esc(t)}</span><br>`;
+  }).join("");
+}
+
+function esc(s) {
+  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+function showTyping() {
+  const chat = document.getElementById("chat");
+  typingEl = document.createElement("div");
+  typingEl.className = "msg";
+  typingEl.innerHTML = `
+    <div class="avatar bot-av">🤖</div>
+    <div class="typing"><span></span><span></span><span></span></div>`;
+  chat.appendChild(typingEl);
+  scrollChat();
+}
+function hideTyping() { if (typingEl) { typingEl.remove(); typingEl = null; } }
+
+function scrollChat() {
+  const c = document.getElementById("chat");
+  c.scrollTop = c.scrollHeight;
+}
+
+function setBtns(on) {
+  ["btn-indef","btn-def"].forEach(id => {
+    const b = document.getElementById(id);
+    b.disabled = !on;
+    b.textContent = on ? "Solve ➤" : "...";
+  });
+}
+</script>
+</body>
+</html>
